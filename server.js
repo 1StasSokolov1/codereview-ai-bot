@@ -268,22 +268,21 @@ function parseRecommendation(review) {
   const recommendationMatch = review.match(/## 🏁 Recommendation\s*\*?\*?([A-Z_]+)/i);
   if (recommendationMatch) {
     const rec = recommendationMatch[1].toUpperCase();
-    if (['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(rec)) {
-      return rec;
-    }
+    // GitHub API is strict about these values
+    if (rec === 'REQUEST_CHANGES') return 'REQUEST_CHANGES';
+    if (rec === 'APPROVE') return 'APPROVE';
+    return 'COMMENT'; // Default to COMMENT for safety
   }
   
-  // Fallback logic based on content
-  if (review.toLowerCase().includes('request changes') || 
-      review.toLowerCase().includes('issues found') && 
-      review.toLowerCase().includes('critical')) {
+  // Fallback logic based on content - be more conservative
+  if (review.toLowerCase().includes('request_changes')) {
     return 'REQUEST_CHANGES';
-  } else if (review.toLowerCase().includes('approve') ||
-             review.toLowerCase().includes('looks good')) {
+  } else if (review.toLowerCase().includes('approve') && 
+             !review.toLowerCase().includes('cannot approve')) {
     return 'APPROVE';
   }
   
-  return 'COMMENT';
+  return 'COMMENT'; // Safe default
 }
 
 // Submit review to GitHub
@@ -300,7 +299,26 @@ async function submitReview(owner, repo, pullNumber, review, event) {
     console.log(`Review submitted for PR #${pullNumber} with event: ${event}`);
   } catch (error) {
     console.error('Error submitting review:', error);
-    throw error;
+    
+    // If REQUEST_CHANGES fails, try as COMMENT instead
+    if (event === 'REQUEST_CHANGES' && error.status === 422) {
+      console.log('Retrying as COMMENT instead of REQUEST_CHANGES');
+      try {
+        await octokit.rest.pulls.createReview({
+          owner,
+          repo,
+          pull_number: pullNumber,
+          body: `**🤖 AI Code Review** (Originally: REQUEST_CHANGES)\n\n${review}`,
+          event: 'COMMENT'
+        });
+        console.log(`Review submitted as COMMENT for PR #${pullNumber}`);
+      } catch (retryError) {
+        console.error('Retry as COMMENT also failed:', retryError);
+        throw retryError;
+      }
+    } else {
+      throw error;
+    }
   }
 }
 
