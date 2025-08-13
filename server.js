@@ -52,28 +52,67 @@ async function getPullRequestDiff(owner, repo, pullNumber) {
       file.changes < 1000 // Skip very large files
     );
 
+    // Get PR details to get the correct head SHA
+    const { data: pr } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: pullNumber,
+    });
+
+    const headSha = pr.head.sha;
+
     const filesWithContent = await Promise.all(
       relevantFiles.map(async (file) => {
         try {
-          const { data: content } = await octokit.rest.repos.getContent({
-            owner,
-            repo,
-            path: file.filename,
-            ref: file.sha,
-          });
+          // For new files or modified files, get content from the PR head
+          if (file.status === 'added' || file.status === 'modified') {
+            try {
+              const { data: content } = await octokit.rest.repos.getContent({
+                owner,
+                repo,
+                path: file.filename,
+                ref: headSha,
+              });
 
-          return {
-            filename: file.filename,
-            status: file.status,
-            additions: file.additions,
-            deletions: file.deletions,
-            changes: file.changes,
-            patch: file.patch,
-            content: Buffer.from(content.content, 'base64').toString('utf-8'),
-            language: getLanguage(file.filename)
-          };
+              return {
+                filename: file.filename,
+                status: file.status,
+                additions: file.additions,
+                deletions: file.deletions,
+                changes: file.changes,
+                patch: file.patch,
+                content: Buffer.from(content.content, 'base64').toString('utf-8'),
+                language: getLanguage(file.filename)
+              };
+            } catch (contentError) {
+              console.warn(`Could not fetch full content for ${file.filename}, using patch only`);
+              // Fallback: return file info with patch only
+              return {
+                filename: file.filename,
+                status: file.status,
+                additions: file.additions,
+                deletions: file.deletions,
+                changes: file.changes,
+                patch: file.patch,
+                content: null, // No full content available
+                language: getLanguage(file.filename)
+              };
+            }
+          } else {
+            // For other statuses, just return the patch info
+            return {
+              filename: file.filename,
+              status: file.status,
+              additions: file.additions,
+              deletions: file.deletions,
+              changes: file.changes,
+              patch: file.patch,
+              content: null,
+              language: getLanguage(file.filename)
+            };
+          }
         } catch (error) {
-          console.error(`Error fetching content for ${file.filename}:`, error.message);
+          console.error(`Error processing file ${file.filename}:`, error.message);
           return null;
         }
       })
@@ -142,8 +181,13 @@ ${files.map(file => `
 
 **Code Changes:**
 \`\`\`diff
-${file.patch}
+${file.patch || 'No patch available'}
 \`\`\`
+
+${file.content ? `**Full File Content:**
+\`\`\`${file.language.toLowerCase()}
+${file.content}
+\`\`\`` : '**Note:** Full file content not available, review based on diff only.'}
 `).join('\n')}
 
 Please provide a comprehensive code review focusing on:
