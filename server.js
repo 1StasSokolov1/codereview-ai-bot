@@ -16,7 +16,7 @@ const config = {
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
-    model: 'gpt-4-turbo-preview'
+    model: 'gpt-4o-mini'  // Updated to current available model
   },
   port: process.env.PORT || 3000
 };
