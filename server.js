@@ -5,6 +5,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { Octokit } = require('@octokit/rest');
 const OpenAI = require('openai');
+require('dotenv').config();
 
 const app = express();
 app.use(express.json());
