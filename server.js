@@ -1,11 +1,9 @@
-// AI Code Review Bot for GitHub
-// This bot automatically reviews pull requests and provides intelligent feedback
-
-const express = require('express');
-const crypto = require('crypto');
-const { Octokit } = require('@octokit/rest');
-const OpenAI = require('openai');
-require('dotenv').config();
+// AI Code Review Bot for GitHub - Fixed ES Module Version
+import 'dotenv/config';
+import express from 'express';
+import crypto from 'crypto';
+import { Octokit } from '@octokit/rest';
+import OpenAI from 'openai';
 
 const app = express();
 app.use(express.json());
@@ -347,7 +345,7 @@ app.get('/health', (req, res) => {
 });
 
 // Start server
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`🤖 AI Code Review Bot running on port ${config.port}`);
   console.log('Ready to review pull requests!');
 });
@@ -361,4 +359,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-module.exports = app;
+export default app;

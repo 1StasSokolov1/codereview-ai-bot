@@ -1,7 +1,8 @@
 {
   "name": "codereview-ai-bot",
   "version": "1.0.0",
-  "main": "github-ai-review-bot.js",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
